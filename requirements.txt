@@ -1,0 +1,8 @@
+flask
+tensorflow
+numpy
+opencv-python
+kafka-python
+pyspark
+mlflow
+pyngrok

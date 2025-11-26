@@ -1,0 +1,14 @@
+# Archivos de sistema y temporales
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Entornos virtuales
+venv/
+env/
+
+# Datos pesados (Opcional, si tu dataset fuera gigante)
+# data/
+
+# Logs de error
+*.log
