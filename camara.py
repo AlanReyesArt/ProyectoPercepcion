@@ -4,40 +4,51 @@ import base64
 import time
 from kafka import KafkaProducer
 
-print("Iniciando Cámara...")
+print("Iniciando Cámara de Alta Velocidad...")
 
-# CONEXIÓN REAL A KAFKA
 try:
     producer = KafkaProducer(
         bootstrap_servers=['localhost:9092'],
+        # Compresión gzip para que viaje más rápido por la red
+        compression_type='gzip',
         value_serializer=lambda v: json.dumps(v).encode('utf-8')
     )
-    print("CÁMARA CONECTADA AL CLÚSTER KAFKA.")
+    print("CÁMARA CONECTADA.")
 except:
     print("Error: Enciende Docker primero.")
     exit()
 
 cap = cv2.VideoCapture(0)
+# Bajamos la resolución de captura de la webcam para ganar velocidad
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
 TOPIC_NAME = 'frutas-stream'
 
 while True:
     ret, frame = cap.read()
     if not ret: break
 
-    # Enviar frame
-    frame_small = cv2.resize(frame, (224, 224))
-    _, buffer = cv2.imencode('.jpg', frame_small)
+    # --- OPTIMIZACIÓN CLAVE: REDUCIR AL TAMAÑO EXACTO DEL MODELO ---
+    # En lugar de enviar una foto HD gigante, enviamos una de 224x224 (muy ligera)
+    frame_model = cv2.resize(frame, (224, 224))
+    
+    # Codificar la imagen pequeña
+    _, buffer = cv2.imencode('.jpg', frame_model, [int(cv2.IMWRITE_JPEG_QUALITY), 70]) # Calidad 70% para velocidad
     img_str = base64.b64encode(buffer).decode('utf-8')
 
+    # Enviar a Kafka
     producer.send(TOPIC_NAME, {'imagen': img_str})
     
-    cv2.imshow('PRODUCTOR KAFKA (Real)', frame)
+    # Mostrar en pantalla la versión normal (para que tú veas bien)
+    cv2.imshow('CAMARA (Envia)', frame)
     
-    # IMPORTANTE: Si envías muy rápido, Kafka puede saturarse en una laptop.
-    # 0.1s es seguro.
-    time.sleep(0.1) 
+    # Enviamos cada 0.15s (aprox 6-7 cuadros por segundo). 
+    # Esto es suficiente para frutas y evita saturar al consumidor.
+    time.sleep(0.15)
     
-    if cv2.waitKey(1) & 0xFF == ord('q'): break
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 
 cap.release()
 cv2.destroyAllWindows()
